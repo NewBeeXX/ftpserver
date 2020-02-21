@@ -2,16 +2,13 @@
 #include"privsock.h"
 #include"sysutil.h"
 #include"tunable.h"
+#include <sys/capability.h>
 
-static void privop_pasv_get_data_sock(session_t* sess);
+static void privop_port_get_data_sock(session_t* sess);
 static void privop_pasv_active(session_t* sess);
 static void privop_pasv_listen(session_t* sess);
 static void privop_pasv_accept(session_t* sess);
 
-///到时可以实验一下能不能直接使用系统调用
-int capset(cap_user_header_t hdr,const cap_user_data_t data){
-    return syscall(__NR_capget,hdr,data);
-}
 
 ///用nobody来限制一下权限 并且单独用一个进程来分离出bind<1024端口的权限 挺好的
 void minimize_privilege(){
@@ -24,12 +21,13 @@ void minimize_privilege(){
     struct __user_cap_header_struct hdr;
     struct __user_cap_data_struct dat;
     bzero(&hdr,sizeof(hdr)),bzero(&dat,sizeof(dat));
-    hdr.version=_LINUX_CAPABILITY_VERSION_1;
+    hdr.version=_LINUX_CAPABILITY_VERSION_2;
     hdr.pid=0;
     __u32 cap_mask=0;
     ///把绑定<1024端口的权限带上
     cap_mask|=(1<<CAP_NET_BIND_SERVICE);
     dat.effective=dat.permitted=cap_mask;
+    ///不允许继承
     dat.inheritable=0;
     capset(&hdr,&dat);
 }
@@ -42,7 +40,7 @@ void handle_parent(session_t* sess){
         cmd=priv_sock_get_cmd(sess->parent_fd);
         if(cmd==PRIV_SOCK_GET_DATA_SOCK){
             ///这个应该是主动模式下20端口去connect客户端的数据端口
-            privop_pasv_get_data_sock(sess);
+            privop_port_get_data_sock(sess);
         }else if(cmd==PRIV_SOCK_PASV_ACTIVE){
             privop_pasv_active(sess);
         }else if(cmd==PRIV_SOCK_PASV_LISTEN){
@@ -54,7 +52,7 @@ void handle_parent(session_t* sess){
 }
 
 
-static void privop_pasv_get_data_sock(session_t* sess){
+static void privop_port_get_data_sock(session_t* sess){
     unsigned short port=(unsigned short)priv_sock_get_int(sess->parent_fd);
     char ip[16]={0};
     priv_sock_recv_buf(sess->parent_fd,ip,sizeof(ip));
@@ -68,7 +66,7 @@ static void privop_pasv_get_data_sock(session_t* sess){
     addr.sin_family=AF_INET;
     addr.sin_port=htons(port);
     addr.sin_addr.s_addr=inet_addr(ip);
-    int fd=tcp_client(0);
+    int fd=tcp_client(20);
     if(fd==-1){
         printf("主动模式 socket bad\n");
         priv_sock_send_result(sess->parent_fd,PRIV_SOCK_RESULT_BAD);
@@ -80,13 +78,14 @@ static void privop_pasv_get_data_sock(session_t* sess){
         priv_sock_send_result(sess->parent_fd,PRIV_SOCK_RESULT_BAD);
         return;
     }
+    printf("##priv par  主动 data socket:%d\n",fd);
     priv_sock_send_result(sess->parent_fd,PRIV_SOCK_RESULT_OK);
     priv_sock_send_fd(sess->parent_fd,fd);
     close(fd);
 
 }
 
-
+///判断pasv 监听是否开启
 static void privop_pasv_active(session_t* sess){
     int active=sess->pasv_listen_fd!=-1?1:0;
     priv_sock_send_int(sess->parent_fd,active);

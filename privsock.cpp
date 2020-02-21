@@ -17,7 +17,7 @@ void priv_sock_close(session_t* sess){
     }
     if(sess->child_fd!=-1){
         close(sess->child_fd);
-        sess->child_fd;
+        sess->child_fd=-1;
     }
 }
 

@@ -289,28 +289,28 @@ int pasv_active(session_t* sess){
 
 ///获取主动模式下的数据端口 要把ip地址和端口号发过去
 int get_port_fd(session_t* sess){
-    puts("diaoni");
+//    puts("diaoni");
 
+///直接把客户端传来的ip地址和端口发给父进程
     priv_sock_send_cmd(sess->child_fd,PRIV_SOCK_GET_DATA_SOCK);
     unsigned short port=ntohs(sess->port_addr->sin_port);
     char* ip=inet_ntoa(sess->port_addr->sin_addr);
     priv_sock_send_int(sess->child_fd,(int)port);
     priv_sock_send_buf(sess->child_fd,ip,strlen(ip));
 
-    printf("youbing\n");
+//    printf("youbing\n");
 
     char res=priv_sock_get_result(sess->child_fd);
 
     printf("get result: %d\n",res);
 
     if(res==PRIV_SOCK_RESULT_BAD){
-        printf("get不到result啊。。\n");
         return 0;
     }
     else if(res==PRIV_SOCK_RESULT_OK)
         sess->data_fd=priv_sock_recv_fd(sess->child_fd);
 
-    printf("get_port_fd: fd:%d\n",sess->data_fd);
+    printf("##get_port_fd: fd:%d\n",sess->data_fd);
 
     return 1;
 }
@@ -332,7 +332,7 @@ int get_transfer_fd(session_t* sess){
         return 0;
     }
 
-    printf("kong kong\n");
+//    printf("kong kong\n");
 
 
     int ret=1;
@@ -347,7 +347,7 @@ int get_transfer_fd(session_t* sess){
     }
     if(ret)start_data_alarm();
 
-    printf("kang kang\n");
+//    printf("kang kang\n");
 
     return ret;
 }
@@ -412,6 +412,7 @@ static void do_quit(session_t* sess){
 	exit(EXIT_SUCCESS);
 }
 
+///仅仅只是把对面发来的地址存下来 ，等到下一个需要数据传输的命令再去connect
 static void do_port(session_t* sess){
     unsigned int v[6];
     sscanf(sess->arg,"%u,%u,%u,%u,%u,%u",v+2,v+3,v+4,v+5,v+0,v+1);
@@ -425,6 +426,7 @@ static void do_port(session_t* sess){
     ftp_reply(sess,FTP_PORTOK,"PORT command successful. Consider using PASV.");
 }
 
+///pasv的话就是真的要开启监听了
 static void do_pasv(session_t* sess){
     char ip[16]={0};
     getlocalip(ip);

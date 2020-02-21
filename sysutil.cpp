@@ -21,7 +21,7 @@ int tcp_client(unsigned short port) {
         addr.sin_port=htons(port);
         addr.sin_addr.s_addr=inet_addr(ip);
         if(bind(sock,(struct sockaddr*)&addr,sizeof(addr))<0)
-            ERR_EXIT("bind");
+            ERR_EXIT("bind??");
     }
     return sock;
 }
@@ -46,7 +46,7 @@ int tcp_server(const char* host,unsigned short port) {
     if(setsockopt(listenfd,SOL_SOCKET,SO_REUSEADDR,(const char*)&on,sizeof(on))<0)
         ERR_EXIT("setsockopt");
     if(bind(listenfd,(struct sockaddr*)&servaddr,sizeof(servaddr))<0)
-        ERR_EXIT("bind");
+        ERR_EXIT("bind??");
     if(listen(listenfd,SOMAXCONN)<0)
         ERR_EXIT("listen");
     return listenfd;
@@ -213,7 +213,7 @@ ssize_t readn(int fd,void* buf,size_t cnt) {
         if((nread=read(fd,rbuf,rest))<0) {
             if(errno==EINTR)continue;
             return -1;
-        } else if(nread==0)return cnt-rest;
+        } else if(nread==0)return cnt-rest; //EOF
         rbuf+=nread;
         rest-=nread;
     }
@@ -227,7 +227,7 @@ ssize_t writen(int fd,const void* buf,size_t cnt) {
     char* wbuf=(char*)buf;
     while(rest>0) {
         if((nwrite=write(fd,wbuf,rest))<0) {
-            if(errno=EINTR)continue;
+            if(errno==EINTR)continue;
             return -1;
         } else if(nwrite==0)continue;
         wbuf+=nwrite;
@@ -246,7 +246,6 @@ ssize_t recv_peek(int fd,void* buf,size_t len) {
 }
 
 ///成功返回>=0 失败返回-1
-///>=0的这个并不是一行的字节数,是最后一次读取的字节数
 ///现在改掉了 成功返回读取的总字节数  为0可以判断为eof
 ssize_t readline(int fd,void* buf,size_t len) {
     int ret,nread,rest=len,tot=0;

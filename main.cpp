@@ -84,6 +84,7 @@ int main(){
             pid=fork();
             if(pid==-1){
                 s_children--;
+                drop_ip_count(&ip);
                 ERR_EXIT("fork");
             }
             if(pid==0){
